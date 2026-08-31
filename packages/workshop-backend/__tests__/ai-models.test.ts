@@ -32,6 +32,13 @@ const WORKERS_AI_CONFIG: AiModelConfig = {
   apiToken: "ignored-in-gateway-mode",
 };
 
+const AI_GATEWAY_COMPAT_CONFIG: AiModelConfig = {
+  provider: "cloudflare-ai-gateway",
+  // A user-typed "{provider}/{model-id}" string -- opaque to us, passed through unchanged.
+  model: "openrouter/anthropic/claude-sonnet-4.5",
+  apiToken: "ignored-in-gateway-mode",
+};
+
 function env(overrides: Partial<Cloudflare.Env> = {}): Cloudflare.Env {
   return {
     CF_AI_GATEWAY: "platform-gateway",
@@ -225,6 +232,28 @@ describe("getModel AI Gateway routing", () => {
     expect(request.headers.get("cf-aig-authorization")).toBe("Bearer gateway-token");
     // Session affinity flows through (Workers AI models opt in to the affinity headers).
     expect(request.headers.get("x-session-affinity")).toBe("session-a");
+  }, 15000);
+
+  it("routes an arbitrary BYOK provider through AI Gateway's compat endpoint", async () => {
+    const handle = getModel(env(), AI_GATEWAY_COMPAT_CONFIG, INITIATOR);
+
+    // No native integration or catalog: the model id is the raw "provider/model-id" string the
+    // user typed, used verbatim as both id and (since there is no display name) name.
+    expect(handle.model.api).toBe("openai-completions");
+    expect(handle.model.id).toBe("openrouter/anthropic/claude-sonnet-4.5");
+    expect(handle.model.provider).toBe("cloudflare-ai-gateway");
+    expect(handle.model.baseUrl).toBe(
+        "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/compat");
+
+    const request = await captureRequest(handle);
+    // pi's OpenAI client appends /chat/completions to baseUrl, matching AI Gateway's documented
+    // .../compat/chat/completions endpoint.
+    expect(request.url).toBe(
+        "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/compat/" +
+        "chat/completions");
+    expect(request.headers.get("cf-aig-authorization")).toBe("Bearer gateway-token");
+    // The typed model string rides through as the request's `model` field, unchanged.
+    expect(JSON.parse(request.body).model).toBe("openrouter/anthropic/claude-sonnet-4.5");
   }, 15000);
 });
 
@@ -447,6 +476,13 @@ describe("getModel direct routing (no gateway)", () => {
     expect(() => getModel(env({ CF_AI_GATEWAY: undefined }),
         { ...WORKERS_AI_CONFIG, ...overrides }, INITIATOR))
         .toThrow("This Workers AI model has no Cloudflare credentials.");
+  });
+
+  it("refuses cloudflare-ai-gateway outside AI Gateway mode", () => {
+    // This provider is a passthrough to this deployment's own AI Gateway /compat route; it has
+    // no standalone BYOK meaning, unlike every other provider handled above.
+    expect(() => getModel(env({ CF_AI_GATEWAY: undefined }), AI_GATEWAY_COMPAT_CONFIG, INITIATOR))
+        .toThrow("only works when AI Gateway mode is enabled");
   });
 
   it("appends /v1 to an Ollama server base URL", () => {

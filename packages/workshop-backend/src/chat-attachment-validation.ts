@@ -38,6 +38,9 @@ const ATTACHMENT_SUPPORT_BY_PROVIDER = {
   google: isTextImageOrPdfMime,
   cloudflare: isTextOrImageMime,
   ollama: isTextOrImageMime,
+  // Rides openai-completions like Workers AI/Ollama, which has no document-bridging arm in
+  // chat-attachment-pdf.ts -- and the passthrough target is unknown besides.
+  "cloudflare-ai-gateway": isTextOrImageMime,
 } satisfies Record<AiModelProvider, (mimeType: string) => boolean>;
 
 function sanitizeChatAttachmentMimeType(mimeType: string | undefined): string {
