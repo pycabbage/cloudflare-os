@@ -22,6 +22,7 @@ const PROVIDER_LABELS: Record<AiModelProvider, string> = {
   google: 'Google',
   cloudflare: 'Cloudflare Workers AI',
   ollama: 'Ollama',
+  'cloudflare-ai-gateway': 'Cloudflare AI Gateway',
 }
 
 // Placeholder hinting at the shape of each provider's API token.
@@ -31,6 +32,7 @@ const API_TOKEN_PLACEHOLDERS: Record<AiModelProvider, string> = {
   google: 'AIza...',
   cloudflare: 'Cloudflare API token',
   ollama: '(optional)',
+  'cloudflare-ai-gateway': '(not needed)',
 }
 
 // Example used in the custom-model placeholders for providers that have no suggested models

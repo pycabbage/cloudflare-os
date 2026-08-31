@@ -1133,7 +1133,8 @@ export type CloudflareAccountOption = {
 };
 
 /** Supported AI providers. */
-export type AiModelProvider = "openai" | "anthropic" | "google" | "cloudflare" | "ollama";
+export type AiModelProvider =
+  "openai" | "anthropic" | "google" | "cloudflare" | "ollama" | "cloudflare-ai-gateway";
 
 /** Information about the AI gateway configuration. Returned by `AuthenticatedApi.getAiConfig()`. */
 export type AiGatewayInfo = {
@@ -1208,6 +1209,15 @@ export const SUGGESTED_MODELS: Record<
     "gemini-3.6-flash": {name: "Gemini 3.6 Flash", contextWindow: 1048576},
   },
   "ollama": {
+  },
+  // Generic AI Gateway compat passthrough: the user types the "{provider}/{model-id}" string
+  // themselves (e.g. "openrouter/deepseek/deepseek-v4-flash-0731"). This one suggested entry is
+  // a cheap default; cost/contextWindow/outputLimit here are pi's own OpenRouter catalog values
+  // for this model, not guesses.
+  "cloudflare-ai-gateway": {
+    "openrouter/deepseek/deepseek-v4-flash-0731": {
+      name: "DeepSeek V4 Flash 0731 via OpenRouter", contextWindow: 1048576, outputLimit: 131072,
+    },
   },
 };
 

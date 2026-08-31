@@ -134,6 +134,7 @@ function catalogModel(provider: AiModelConfig["provider"], modelId: string): Mod
     case "google": return (GOOGLE_MODELS as Record<string, Model<Api>>)[modelId];
     case "cloudflare": return (CLOUDFLARE_WORKERS_AI_MODELS as Record<string, Model<Api>>)[modelId];
     case "ollama": return undefined;
+    case "cloudflare-ai-gateway": return undefined;
     default: return undefined;
   }
 }
@@ -242,6 +243,27 @@ function gatewayNativeModel(config: AiModelConfig, gatewayUrl: string): Model<Ap
         cost: catalog?.cost ?? ZERO_COST,
         ...window,
         compat: workersAiCompat(catalog),
+      };
+    case "cloudflare-ai-gateway":
+      // Generic BYOK passthrough: the user types "{provider}/{model-id}" themselves (e.g.
+      // "openrouter/anthropic/claude-sonnet-4.5") and AI Gateway's Universal/compat endpoint
+      // resolves it against whatever provider key is stored on the gateway -- no native
+      // integration or catalog for it. `provider` must stay exactly "cloudflare-ai-gateway":
+      // pi's openai-completions adapter pattern-matches this string (as well as sniffing
+      // gateway.ai.cloudflare.com in the URL, which the binding-routed baseUrl never contains)
+      // to apply compat quirks tuned for this endpoint (no strict-mode tools, no
+      // reasoning_effort, max_tokens over max_completion_tokens). No `compat` override here:
+      // pi's auto-detection for this exact provider string is already the right behavior.
+      return {
+        id: config.model,
+        name: config.model,
+        api: "openai-completions",
+        provider: "cloudflare-ai-gateway",
+        baseUrl: `${gatewayUrl}/compat`,
+        reasoning: true,
+        input: ["text", "image"],
+        cost: ZERO_COST,
+        ...window,
       };
     default:
       return undefined;
@@ -639,6 +661,13 @@ function getModelDirect(config: AiModelConfig, sessionAffinity?: string): ModelH
         apiKey: config.apiToken,
         sessionAffinity,
       });
+    case "cloudflare-ai-gateway":
+      // A synthetic passthrough to whatever AI Gateway's /compat endpoint resolves the typed
+      // "{provider}/{model-id}" string to -- it only makes sense routed through this
+      // deployment's own AI Gateway, never as standalone BYOK.
+      throw new Error(
+          "The cloudflare-ai-gateway provider only works when AI Gateway mode is enabled " +
+          "(deployment.jsonc aiGateway.enabled: true).");
     default:
       config.provider satisfies never;
       throw new Error(`Unknown provider "${config.provider}".`);
